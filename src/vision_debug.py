@@ -197,6 +197,8 @@ class BlobDetector():
                     internal_corners[2:] = sorted(internal_corners[2:], key=lambda c: c[1])
                     internal_corners = np.array(internal_corners, dtype=np.float32)
 
+                    # all_corners = np.concatenate((corners, internal_corners), axis=0)
+
                     coordinate_corners = np.array([np.array([2, 10, 0]),
                                                    np.array([2, 2, 0]),
                                                    np.array([18, 10, 0]),
@@ -204,11 +206,11 @@ class BlobDetector():
 
                     # calibration = cv2.calibrateCamera([coordinate_corners], [internal_corners], self.image_rgb_hulls.shape[:2])
 
-                    camera_matrix = np.array([[6.5746697944293521e+002, 0., 3.1950000000000000e+002],
-                                             [0., 6.5746697944293521e+002, 2.3950000000000000e+002],
-                                             [0., 0., 1.]], dtype=np.float32)
+                    camera_matrix = np.array([[560.477787, 0.000000, 333.440324],
+                                             [0.000000, 564.670012, 257.144953],
+                                             [0.000000, 0.000000, 1.000000]], dtype=np.float32)
 
-                    distortion_coefficients = np.array([[-4.1802327176423804e-001, 5.0715244063187526e-001, 0., 0., -5.7843597214487474e-001]], dtype=np.float32)
+                    distortion_coefficients = np.array([[-0.321453, 0.145752, 0.000272, 0.002556, 0.000000]], dtype=np.float32)
 
                     if len(internal_corners) == 4:
 
