@@ -170,12 +170,18 @@ class BlobDetector():
 
                     axis_pts = cv2.projectPoints(np.array([[0, 0, 0], [0, 6, 0], [6, 0, 0], [0, 0, 6]], dtype=np.float32),
                                                  rvec, tvec, camera_matrix, distortion_coefficients)[0]
-                    print axis_pts[0].ravel()
+                    origin = (int(axis_pts[0].ravel()[0]), int(axis_pts[0].ravel()[1]))
+                    pt1 = (int(axis_pts[1].ravel()[0]), int(axis_pts[1].ravel()[1]))
+                    pt2 = (int(axis_pts[2].ravel()[0]), int(axis_pts[2].ravel()[1]))
+                    pt3 = (int(axis_pts[3].ravel()[0]), int(axis_pts[3].ravel()[1]))
 
-                    cv2.line(self.image_rgb_hulls, axis_pts[0], axis_pts[1], (255, 0, 0), thickness=3)
-                    cv2.line(self.image_rgb_hulls, axis_pts[0], axis_pts[2], (0, 255, 0), thickness=3)
-                    cv2.line(self.image_rgb_hulls, axis_pts[0], axis_pts[3], (0, 0, 255), thickness=3)
-
+                    try:
+                        cv2.line(self.image_rgb_hulls, origin, pt1, (0, 255, 0), thickness=3)
+                        cv2.line(self.image_rgb_hulls, origin, pt2, (255, 0, 0), thickness=3)
+                        cv2.line(self.image_rgb_hulls, origin, pt3, (0, 0, 255), thickness=3)
+                    except OverflowError:
+                        print "Invalid corner configuration"
+                        pass
 
             try:
                 hull_image = Image.fromarray(self.image_rgb_hulls)
