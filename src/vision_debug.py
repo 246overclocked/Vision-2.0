@@ -61,12 +61,12 @@ class BlobDetector():
         self.bottom.pack(side='bottom', fill='both', expand=True)
         self.panel_left = None
         self.panel_right = None
-        save_btn = tki.Button(self.root, text="Open Config")  # command=lambda: self.file_open()
+        save_btn = tki.Button(self.root, text="Open Config", command=lambda: self.file_open())
         open_btn = tki.Button(self.root, text="Save Config", command= lambda: self.file_save())
         snapshot_btn = tki.Button(self.root, text="Take Snapshot")  # TODO add 'save snapshot' function
-        save_btn.pack(in_=self.bottom, side="left", fill=None, expand="yes", padx=5, pady=5)
-        open_btn.pack(in_=self.bottom, side="left", fill=None, expand="yes", padx=5, pady=5)
-        snapshot_btn.pack(in_=self.bottom, side="left", fill=None, expand="yes", padx=5, pady=5)
+        save_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=10)
+        open_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=10)
+        snapshot_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=10)
         self.image_rgb_filtered = None
         self.image_rgb_hulls = np.zeros((600, 800, 3), np.uint8)
 
@@ -88,7 +88,7 @@ class BlobDetector():
                 continue
 
             imageHSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-            self.image_rgb_hulls = np.zeros((600, 800, 3), np.uint8)
+            self.image_rgb_hulls = np.zeros((self.image.shape[0], self.image.shape[1], 3), np.uint8)
             COLOR_BOUNDS = [np.array([self.hl, self.sl, self.vl]), np.array([self.hu, self.su, self.vu])]
             self.finalMask = cv2.inRange(imageHSV, COLOR_BOUNDS[0], COLOR_BOUNDS[1])
 
@@ -155,6 +155,23 @@ class BlobDetector():
                     "\nvu:" + str(self.vu)
         f.write(text2save)
         f.close()
+
+    def file_open(self):
+        f = tkFileDialog.askopenfile(mode='r', defaultextension=".txt")
+        if f is None:
+            return
+        params = f.readlines()
+        print params
+        try:
+            cv2.setTrackbarPos('HL', 'HSV', int(params[0].split(':')[1]))
+            cv2.setTrackbarPos('SL', 'HSV', int(params[1].split(':')[1]))
+            cv2.setTrackbarPos('VL', 'HSV', int(params[2].split(':')[1]))
+            cv2.setTrackbarPos('HU', 'HSV', int(params[3].split(':')[1]))
+            cv2.setTrackbarPos('SU', 'HSV', int(params[4].split(':')[1]))
+            cv2.setTrackbarPos('VU', 'HSV', int(params[5].split(':')[1]))
+        except:
+            print "Invalid file structure"
+            return
 
     def find_area(self, contour):
         moments = cv2.moments(contour)
