@@ -27,7 +27,7 @@ class BlobDetector():
 
     def __init__(self):
 
-        self.image = np.zeros((600, 800, 3), np.uint8)  # sets a default blank image/mask as a placeholders
+        self.image = np.zeros((600, 800, 3), np.float32)  # sets a default blank image/mask as a placeholders
         self.finalMask = self.image
 
         self.hl = 0
@@ -79,8 +79,8 @@ class BlobDetector():
         snapshot_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=3)
 
         self.image_rgb_filtered = None
-        self.image_rgb_hulls = np.zeros((600, 800, 3), np.uint8)
-        self.corners = np.zeros((600, 800, 3), np.uint8)
+        self.image_rgb_hulls = np.zeros((600, 800, 3), np.float32)
+        self.corners = np.zeros(self.image_rgb_hulls.size, self.image_rgb_hulls.dtype)
 
     def image_callback(self):
 
@@ -136,13 +136,10 @@ class BlobDetector():
                                      thickness=cv.CV_FILLED)  # draws contour(s)
                     epsilon = 0.01 * cv2.arcLength(hulls[0], True)
                     # cv2.drawContours(self.image_rgb_hulls, cv2.approxPolyDP(hulls[0], epsilon, True), -1, (0, 255, 0), thickness=5)
-                    corners = cv.CornerHarris(cv.fromarray(cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY)),
-                                              cv.fromarray(self.corners), 2, k=0.15)
-                    print corners
-                    for i in range(len(corners)):
-                        corners[i] = list(corners[i])
-                    ctr = np.array(corners).reshape((-1, 1, 2)).astype(np.int32)
-                    cv2.drawContours(self.image_rgb_hulls, [ctr], -1, (0, 255, 0), thickness=5)
+                    gray = cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY)
+                    gray = np.float32(gray)
+                    self.corners = cv2.cornerHarris(gray, 2, 3, 0.15)
+                    cv2.drawContours(self.image_rgb_hulls, self.corners, -1, (0, 255, 0), thickness=5)
 
             # TODO add remaining code (corners and calibration) here...
 
