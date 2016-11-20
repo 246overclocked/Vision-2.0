@@ -4,18 +4,16 @@
 # you can adjust the bounds of HSV color filtering.
 #
 
-import cv2
+import Tkinter as tki
+import colorsys
 import cv
 import numpy as np
-import VisionUtilities
+import tkFileDialog
+import tkMessageBox
 from PIL import Image
 from PIL import ImageTk
-import Tkinter as tki
-import tkFileDialog
-import FileDialog
-import os
-import colorsys
 from Tkinter import Frame
+import cv2
 
 __author__ = "Jacob Nazarenko"
 __email__ = "jacobn@bu.edu"
@@ -29,58 +27,54 @@ class BlobDetector():
 
     def __init__(self):
 
-        def nothing(x):
-            pass
-
         self.image = np.zeros((600, 800, 3), np.uint8)  # sets a default blank image/mask as a placeholders
         self.finalMask = self.image
 
-        cv2.namedWindow('HSV')
-        cv2.createTrackbar('HL', 'HSV', 0, 180, nothing)
-        cv2.createTrackbar('SL', 'HSV', 0, 255, nothing)
-        cv2.createTrackbar('VL', 'HSV', 0, 255, nothing)
-        cv2.createTrackbar('HU', 'HSV', 180, 180, nothing)
-        cv2.createTrackbar('SU', 'HSV', 255, 255, nothing)
-        cv2.createTrackbar('VU', 'HSV', 255, 255, nothing)
         self.hl = 0
         self.sl = 0
         self.vl = 0
-        self.hu = 0
-        self.su = 0
-        self.vu = 0
-
-        self.window_thread = VisionUtilities.StoppableThread(target=self.window_runner)
-        self.window_thread.start()
+        self.hu = 180
+        self.su = 255
+        self.vu = 255
 
         self.stopped = False
 
         self.root = tki.Tk()
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.top = Frame(self.root)
         self.bottom = Frame(self.root)
         self.top.pack(side='top')
         self.bottom.pack(side='bottom', fill='both', expand=True)
         self.panel_left = None
         self.panel_right = None
+
         w, h = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         self.root.geometry("%dx%d+0+0" % (w, h))
-        self.hl_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+
+        # TODO still need to create labels (preferably on the left side) for these sliders!!
+        self.hl_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback)
         self.hl_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
-        self.sl_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+        self.sl_slider = tki.Scale(self.root, from_=0, to=255, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback)
         self.sl_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
-        self.vl_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+        self.vl_slider = tki.Scale(self.root, from_=0, to=255, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback)
         self.vl_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
-        self.hu_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+        self.hu_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback)
         self.hu_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
-        self.su_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+        self.su_slider = tki.Scale(self.root, from_=0, to=255, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback)
         self.su_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
-        self.vu_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+        self.vu_slider = tki.Scale(self.root, from_=0, to=255, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback)
         self.vu_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
+        self.hu_slider.set(180)
+        self.su_slider.set(255)
+        self.vu_slider.set(255)
+
         save_btn = tki.Button(self.root, text="Open Config", command=lambda: self.file_open())
         open_btn = tki.Button(self.root, text="Save Config", command=lambda: self.file_save())
         snapshot_btn = tki.Button(self.root, text="Take Snapshot")  # TODO add 'save snapshot' function
         save_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=3)
         open_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=3)
         snapshot_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=3)
+
         self.image_rgb_filtered = None
         self.image_rgb_hulls = np.zeros((600, 800, 3), np.uint8)
 
@@ -127,6 +121,8 @@ class BlobDetector():
                                  (contour_color[0]*255, contour_color[1]*255, contour_color[2]*255),
                                  thickness=cv.CV_FILLED)  # draws contour(s)
 
+            # TODO add remaining code (corners and calibration) here...
+
             try:
                 hull_image = Image.fromarray(self.image_rgb_hulls)
                 hull_image = ImageTk.PhotoImage(hull_image)
@@ -136,10 +132,10 @@ class BlobDetector():
                 if self.panel_right is None or self.panel_left is None:
                     self.panel_left = tki.Label(image=filtered_image)
                     self.panel_left.image = filtered_image
-                    self.panel_left.pack(side="left", padx=10, pady=10)
+                    self.panel_left.pack(side="left", padx=80, pady=10)
                     self.panel_right = tki.Label(image=hull_image)
                     self.panel_right.image = hull_image
-                    self.panel_right.pack(side="right", padx=10, pady=10)
+                    self.panel_right.pack(side="right", padx=80, pady=10)
 
                 else:
                     self.panel_left.configure(image=filtered_image)
@@ -153,7 +149,6 @@ class BlobDetector():
             self.root.update_idletasks()
             self.root.update()
 
-        self.window_thread.stop()
         cv2.destroyAllWindows()
         return
 
@@ -176,17 +171,17 @@ class BlobDetector():
             return
         params = f.readlines()
         try:
-            cv2.setTrackbarPos('HL', 'HSV', int(params[0].split(':')[1]))
-            cv2.setTrackbarPos('SL', 'HSV', int(params[1].split(':')[1]))
-            cv2.setTrackbarPos('VL', 'HSV', int(params[2].split(':')[1]))
-            cv2.setTrackbarPos('HU', 'HSV', int(params[3].split(':')[1]))
-            cv2.setTrackbarPos('SU', 'HSV', int(params[4].split(':')[1]))
-            cv2.setTrackbarPos('VU', 'HSV', int(params[5].split(':')[1]))
+            self.hl_slider.set(int(params[0].split(':')[1]))
+            self.sl_slider.set(int(params[1].split(':')[1]))
+            self.vl_slider.set(int(params[2].split(':')[1]))
+            self.hu_slider.set(int(params[3].split(':')[1]))
+            self.su_slider.set(int(params[4].split(':')[1]))
+            self.vu_slider.set(int(params[5].split(':')[1]))
         except:
             print "Invalid file structure"
             return
 
-    def slider_callback(self):
+    def slider_callback(self, new_value):
         try:
             self.hl = self.hl_slider.get()
             self.sl = self.sl_slider.get()
@@ -196,6 +191,11 @@ class BlobDetector():
             self.vu = self.vu_slider.get()
         except AttributeError:
             pass
+
+    def on_closing(self):
+        if tkMessageBox.askokcancel("Quit", "Do you want to quit?"):
+            self.root.destroy()
+            self.stopped = True
 
     def find_area(self, contour):
         moments = cv2.moments(contour)
@@ -209,24 +209,7 @@ class BlobDetector():
 
         return x_val, y_val
 
-    def window_runner(self):
-        cv2.imshow('HSV', cv2.resize(self.image, None, fx=0.8, fy=0.8, interpolation=cv2.INTER_AREA))
-        k = cv2.waitKey(1) & 0xFF
-        if k == 27:
-            self.stopped = True
-            return 1
-
-        self.hl = cv2.getTrackbarPos('HL', 'HSV')
-        self.sl = cv2.getTrackbarPos('SL', 'HSV')
-        self.vl = cv2.getTrackbarPos('VL', 'HSV')
-        self.hu = cv2.getTrackbarPos('HU', 'HSV')
-        self.su = cv2.getTrackbarPos('SU', 'HSV')
-        self.vu = cv2.getTrackbarPos('VU', 'HSV')
-
-        return 0
-
 
 if __name__ == "__main__":
     detector = BlobDetector()
     detector.image_callback()
-    cv2.destroyAllWindows()
