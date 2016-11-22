@@ -4,25 +4,28 @@
 # you can adjust the bounds of HSV color filtering.
 #
 
+import cv2
+import cv
+import numpy as np
+import VisionUtilities
+
 __author__ = "Jacob Nazarenko"
 __email__ = "jacobn@bu.edu"
 __license__ = "MIT"
 
-import cv2
-import cv
-import numpy as np
 
-class blob_detector:
+class BlobDetector:
+
+    """The main class representing the vision detection process. Only one instance needs to be created,
+    and all of the graphics and calculations should be taken care of by this instance. """
 
     def __init__(self):
 
         def nothing(x):
             pass
 
-        self.image = np.zeros((480, 640, 3), np.uint8)  # sets a default blank image/mask as a placeholders
+        self.image = np.zeros((600, 800, 3), np.uint8)  # sets a default blank image/mask as a placeholders
         self.finalMask = self.image
-
-        self.camera_ip = "192.168.1.199"  # be sure to enter the correct camera ip here!
 
         cv2.namedWindow('HSV')
         cv2.createTrackbar('HL', 'HSV', 0, 180, nothing)
@@ -38,17 +41,23 @@ class blob_detector:
         self.su = 0
         self.vu = 0
 
+        self.window_thread = VisionUtilities.StoppableThread(target=self.window_runner)
+        self.window_thread.start()
+
+        self.stopped = False
+
     def image_callback(self):
 
         print("Hello, OpenCV!\nLoading feed...")
-        cap = cv2.VideoCapture("http://root:underclocked@" + self.camera_ip + "/mjpg/video.mjpg")
+        # be sure to enter the correct camera ip here!
+        cap = cv2.VideoCapture("http://root:underclocked@192.168.1.199/mjpg/video.mjpg")
         if not cap.isOpened():
             print "ERROR RETRIEVING STREAM!\nExiting..."
             return
         else:
             print "Success!\nAnalyzing stream..."
 
-        while(True):
+        while not self.stopped:
             retval, frame = cap.read()
             if not retval:
                 print "ERROR READING FRAME!"
@@ -94,13 +103,11 @@ class blob_detector:
             #         c = self.find_center(contour)
             #         pos = Point(x=c[0], y=c[1], z=0.0)
 
-            self.hl = cv2.getTrackbarPos('HL', 'HSV')
-            self.sl = cv2.getTrackbarPos('SL', 'HSV')
-            self.vl = cv2.getTrackbarPos('VL', 'HSV')
-            self.hu = cv2.getTrackbarPos('HU', 'HSV')
-            self.su = cv2.getTrackbarPos('SU', 'HSV')
-            self.vu = cv2.getTrackbarPos('VU', 'HSV')
-            cv2.imshow('HSV', cv2.resize(self.image, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA))
+            # cv2.waitKey(0)
+
+        self.window_thread.stop()
+        cv2.destroyAllWindows()
+        return
 
     def find_area(self, contour):
         moments = cv2.moments(contour)
@@ -114,7 +121,24 @@ class blob_detector:
 
         return x_val, y_val
 
+    def window_runner(self):
+        cv2.imshow('HSV', cv2.resize(self.image, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA))
+        k = cv2.waitKey(1) & 0xFF
+        if k == 27:
+            self.stopped = True
+            return 1
+
+        self.hl = cv2.getTrackbarPos('HL', 'HSV')
+        self.sl = cv2.getTrackbarPos('SL', 'HSV')
+        self.vl = cv2.getTrackbarPos('VL', 'HSV')
+        self.hu = cv2.getTrackbarPos('HU', 'HSV')
+        self.su = cv2.getTrackbarPos('SU', 'HSV')
+        self.vu = cv2.getTrackbarPos('VU', 'HSV')
+
+        return 0
+
 
 if __name__ == "__main__":
-    detector = blob_detector()
+    detector = BlobDetector()
     detector.image_callback()
+    cv2.destroyAllWindows()
