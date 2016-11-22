@@ -31,9 +31,9 @@ class BlobDetector:
         cv2.createTrackbar('HL', 'HSV', 0, 180, nothing)
         cv2.createTrackbar('SL', 'HSV', 0, 255, nothing)
         cv2.createTrackbar('VL', 'HSV', 0, 255, nothing)
-        cv2.createTrackbar('HU', 'HSV', 0, 180, nothing)
-        cv2.createTrackbar('SU', 'HSV', 0, 255, nothing)
-        cv2.createTrackbar('VU', 'HSV', 0, 255, nothing)
+        cv2.createTrackbar('HU', 'HSV', 180, 180, nothing)
+        cv2.createTrackbar('SU', 'HSV', 255, 255, nothing)
+        cv2.createTrackbar('VU', 'HSV', 255, 255, nothing)
         self.hl = 0
         self.sl = 0
         self.vl = 0
@@ -55,7 +55,7 @@ class BlobDetector:
             print "ERROR RETRIEVING STREAM!\nExiting..."
             return
         else:
-            print "Success!\nAnalyzing stream..."
+            print "Success!\nAnalyzing stream...     (Press ESC to quit!)"
 
         while not self.stopped:
             retval, frame = cap.read()
@@ -81,14 +81,13 @@ class BlobDetector:
             filteredHSV = cv2.bitwise_and(imageHSV, imageHSV, mask=self.finalMask)
             self.image = cv2.cvtColor(filteredHSV, cv2.COLOR_HSV2BGR)
             contours, h = cv2.findContours(self.finalMask, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
-            contours = sorted(contours, key=lambda c: cv2.contourArea(c), reverse=True)
             # print "Found", len(contours), "contours"
-            hull = []
             if len(contours) > 0:
-                hull = cv2.convexHull(contours[0])
+                hulls = [cv2.convexHull(cnt) for cnt in contours]
+                hulls = sorted(hulls, key=lambda c: cv2.contourArea(c), reverse=True)
 
-            # TODO implement automatic color detection (of center) for drawing
-            cv2.drawContours(self.image, hull, -1, (255,0,0), thickness=cv.CV_FILLED)  # draws contour(s)
+                # TODO implement automatic color detection (of center) for drawing
+                cv2.drawContours(self.image, hulls, 0, (0, 0, 255), thickness=cv.CV_FILLED)  # draws contour(s)
 
             # Code for working with multiple vision targets:
             # for contour in contours:
@@ -122,7 +121,7 @@ class BlobDetector:
         return x_val, y_val
 
     def window_runner(self):
-        cv2.imshow('HSV', cv2.resize(self.image, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA))
+        cv2.imshow('HSV', cv2.resize(self.image, None, fx=0.8, fy=0.8, interpolation=cv2.INTER_AREA))
         k = cv2.waitKey(1) & 0xFF
         if k == 27:
             self.stopped = True
