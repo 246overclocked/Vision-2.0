@@ -8,6 +8,10 @@ import cv2
 import cv
 import numpy as np
 import VisionUtilities
+from PIL import Image
+from PIL import ImageTk
+import Tkinter as tki
+import os
 
 __author__ = "Jacob Nazarenko"
 __email__ = "jacobn@bu.edu"
@@ -46,11 +50,17 @@ class BlobDetector:
 
         self.stopped = False
 
+        self.root = tki.Tk()
+        self.panel = None
+        btn = tki.Button(self.root, text="Snapshot!")  # TODO put in command=self.[function]
+        btn.pack(side="bottom", fill="both", expand="yes", padx=10, pady=10)
+        self.image_bgr = None
+
     def image_callback(self):
 
         print("Hello, OpenCV!\nLoading feed...")
         # be sure to enter the correct camera ip here!
-        cap = cv2.VideoCapture("http://root:underclocked@192.168.1.199/mjpg/video.mjpg")
+        cap = cv2.VideoCapture("http://root:underclocked@128.197.50.90/mjpg/video.mjpg")
         if not cap.isOpened():
             print "ERROR RETRIEVING STREAM!\nExiting..."
             return
@@ -68,41 +78,42 @@ class BlobDetector:
             self.finalMask = cv2.inRange(imageHSV, COLOR_BOUNDS[0], COLOR_BOUNDS[1])
 
             # TODO call this version 'debug' and create separate version that will use an unchangeable mask:
-
             # GREEN_BOUNDS = [np.array([40, 110, 80]), np.array([80, 255, 255])]  # Green filter values
             # RED_BOUNDS = [np.array([0, 180, 80]), np.array([16, 255, 255])]  # Red filter values
             # redMask = cv2.inRange(imageHSV, RED_BOUNDS[0], RED_BOUNDS[1])
             # greenMask = cv2.inRange(imageHSV, GREEN_BOUNDS[0], GREEN_BOUNDS[1])
             # self.finalMask = cv2.add(redMask, greenMask)
 
-            # we may need to erode, but I'll leave this commented out for now:
-            # self.finalMask = cv2.erode(self.finalMask, (5,5), iterations=5)
-
             filteredHSV = cv2.bitwise_and(imageHSV, imageHSV, mask=self.finalMask)
             self.image = cv2.cvtColor(filteredHSV, cv2.COLOR_HSV2BGR)
+            self.image_bgr = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
             contours, h = cv2.findContours(self.finalMask, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
             # print "Found", len(contours), "contours"
-            if len(contours) > 0:
-                hulls = [cv2.convexHull(cnt) for cnt in contours]
-                hulls = sorted(hulls, key=lambda c: cv2.contourArea(c), reverse=True)
+            # if len(contours) > 0:
+            #     hulls = [cv2.convexHull(cnt) for cnt in contours]
+            #     hulls = sorted(hulls, key=lambda c: cv2.contourArea(c), reverse=True)
+            #
+            #     # TODO implement automatic color detection (of center) for drawing
+            #     cv2.drawContours(self.image, hulls, 0, (0, 0, 255), thickness=cv.CV_FILLED)  # draws contour(s)
 
-                # TODO implement automatic color detection (of center) for drawing
-                cv2.drawContours(self.image, hulls, 0, (0, 0, 255), thickness=cv.CV_FILLED)  # draws contour(s)
+            try:
+                image = Image.fromarray(self.image_bgr)
+                image = ImageTk.PhotoImage(image)
 
-            # Code for working with multiple vision targets:
-            # for contour in contours:
-            #     area = cv2.contourArea(contour)
-            #     x, y, w, h = cv2.boundingRect(contour)
-            #     rect_area = w * h
-            #     extent = float(area) / rect_area
-            #     if extent > 0 and self.find_area(contour) > 2000:
-            #         rect = cv2.minAreaRect(contour)
-            #         box = cv2.cv.BoxPoints(rect)
-            #         box = np.int0(box)
-            #         c = self.find_center(contour)
-            #         pos = Point(x=c[0], y=c[1], z=0.0)
+                if self.panel is None:
+                    self.panel = tki.Label(image=image)
+                    self.panel.image = image
+                    self.panel.pack(side="left", padx=10, pady=10)
 
-            # cv2.waitKey(0)
+                else:
+                    self.panel.configure(image=image)
+                    self.panel.image = image
+
+            except RuntimeError:
+                print("[INFO] caught a RuntimeError")
+
+            self.root.update_idletasks()
+            self.root.update()
 
         self.window_thread.stop()
         cv2.destroyAllWindows()
