@@ -11,14 +11,18 @@ import VisionUtilities
 from PIL import Image
 from PIL import ImageTk
 import Tkinter as tki
+import tkFileDialog
+import FileDialog
 import os
+import colorsys
+from Tkinter import Frame
 
 __author__ = "Jacob Nazarenko"
 __email__ = "jacobn@bu.edu"
 __license__ = "MIT"
 
 
-class BlobDetector:
+class BlobDetector():
 
     """The main class representing the vision detection process. Only one instance needs to be created,
     and all of the graphics and calculations should be taken care of by this instance. """
@@ -51,10 +55,20 @@ class BlobDetector:
         self.stopped = False
 
         self.root = tki.Tk()
-        self.panel = None
-        btn = tki.Button(self.root, text="Snapshot!")  # TODO put in command=self.[function]
-        btn.pack(side="bottom", fill="both", expand="yes", padx=10, pady=10)
-        self.image_bgr = None
+        self.top = Frame(self.root)
+        self.bottom = Frame(self.root)
+        self.top.pack(side='top')
+        self.bottom.pack(side='bottom', fill='both', expand=True)
+        self.panel_left = None
+        self.panel_right = None
+        save_btn = tki.Button(self.root, text="Open Config")  # command=lambda: self.file_open()
+        open_btn = tki.Button(self.root, text="Save Config", command= lambda: self.file_save())
+        snapshot_btn = tki.Button(self.root, text="Take Snapshot")  # TODO add 'save snapshot' function
+        save_btn.pack(in_=self.bottom, side="left", fill=None, expand="yes", padx=5, pady=5)
+        open_btn.pack(in_=self.bottom, side="left", fill=None, expand="yes", padx=5, pady=5)
+        snapshot_btn.pack(in_=self.bottom, side="left", fill=None, expand="yes", padx=5, pady=5)
+        self.image_rgb_filtered = None
+        self.image_rgb_hulls = np.zeros((600, 800, 3), np.uint8)
 
     def image_callback(self):
 
@@ -74,6 +88,7 @@ class BlobDetector:
                 continue
 
             imageHSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            self.image_rgb_hulls = np.zeros((600, 800, 3), np.uint8)
             COLOR_BOUNDS = [np.array([self.hl, self.sl, self.vl]), np.array([self.hu, self.su, self.vu])]
             self.finalMask = cv2.inRange(imageHSV, COLOR_BOUNDS[0], COLOR_BOUNDS[1])
 
@@ -86,28 +101,37 @@ class BlobDetector:
 
             filteredHSV = cv2.bitwise_and(imageHSV, imageHSV, mask=self.finalMask)
             self.image = cv2.cvtColor(filteredHSV, cv2.COLOR_HSV2BGR)
-            self.image_bgr = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+            self.image_rgb_filtered = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
             contours, h = cv2.findContours(self.finalMask, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
             # print "Found", len(contours), "contours"
-            # if len(contours) > 0:
-            #     hulls = [cv2.convexHull(cnt) for cnt in contours]
-            #     hulls = sorted(hulls, key=lambda c: cv2.contourArea(c), reverse=True)
-            #
-            #     # TODO implement automatic color detection (of center) for drawing
-            #     cv2.drawContours(self.image, hulls, 0, (0, 0, 255), thickness=cv.CV_FILLED)  # draws contour(s)
+            if len(contours) > 0:
+                hulls = [cv2.convexHull(cnt) for cnt in contours]
+                hulls = sorted(hulls, key=lambda c: cv2.contourArea(c), reverse=True)
+
+                contour_color = colorsys.hsv_to_rgb(abs(self.hu + self.hl)/360.0, 1, 1)
+                cv2.drawContours(self.image_rgb_hulls, hulls, 0,
+                                 (contour_color[0]*255, contour_color[1]*255, contour_color[2]*255),
+                                 thickness=cv.CV_FILLED)  # draws contour(s)
 
             try:
-                image = Image.fromarray(self.image_bgr)
-                image = ImageTk.PhotoImage(image)
+                hull_image = Image.fromarray(self.image_rgb_hulls)
+                hull_image = ImageTk.PhotoImage(hull_image)
+                filtered_image = Image.fromarray(self.image_rgb_filtered)
+                filtered_image = ImageTk.PhotoImage(filtered_image)
 
-                if self.panel is None:
-                    self.panel = tki.Label(image=image)
-                    self.panel.image = image
-                    self.panel.pack(side="left", padx=10, pady=10)
+                if self.panel_right is None or self.panel_left is None:
+                    self.panel_left = tki.Label(image=filtered_image)
+                    self.panel_left.image = filtered_image
+                    self.panel_left.pack(side="left", padx=10, pady=10)
+                    self.panel_right = tki.Label(image=hull_image)
+                    self.panel_right.image = hull_image
+                    self.panel_right.pack(side="right", padx=10, pady=10)
 
                 else:
-                    self.panel.configure(image=image)
-                    self.panel.image = image
+                    self.panel_left.configure(image=filtered_image)
+                    self.panel_left.image = filtered_image
+                    self.panel_right.configure(image=hull_image)
+                    self.panel_right.image = hull_image
 
             except RuntimeError:
                 print("[INFO] caught a RuntimeError")
@@ -118,6 +142,19 @@ class BlobDetector:
         self.window_thread.stop()
         cv2.destroyAllWindows()
         return
+
+    def file_save(self):
+        f = tkFileDialog.asksaveasfile(mode='w', defaultextension=".txt")
+        if f is None:
+            return
+        text2save = "hl:" + str(self.hl) + \
+                    "\nsl:" + str(self.sl) + \
+                    "\nvl:" + str(self.vl) + \
+                    "\nhu:" + str(self.hu) + \
+                    "\nsu:" + str(self.su) + \
+                    "\nvu:" + str(self.vu)
+        f.write(text2save)
+        f.close()
 
     def find_area(self, contour):
         moments = cv2.moments(contour)
