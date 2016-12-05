@@ -61,12 +61,26 @@ class BlobDetector():
         self.bottom.pack(side='bottom', fill='both', expand=True)
         self.panel_left = None
         self.panel_right = None
+        w, h = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        self.root.geometry("%dx%d+0+0" % (w, h))
+        self.hl_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+        self.hl_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
+        self.sl_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+        self.sl_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
+        self.vl_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+        self.vl_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
+        self.hu_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+        self.hu_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
+        self.su_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+        self.su_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
+        self.vu_slider = tki.Scale(self.root, from_=0, to=180, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback())
+        self.vu_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
         save_btn = tki.Button(self.root, text="Open Config", command=lambda: self.file_open())
-        open_btn = tki.Button(self.root, text="Save Config", command= lambda: self.file_save())
+        open_btn = tki.Button(self.root, text="Save Config", command=lambda: self.file_save())
         snapshot_btn = tki.Button(self.root, text="Take Snapshot")  # TODO add 'save snapshot' function
-        save_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=10)
-        open_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=10)
-        snapshot_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=10)
+        save_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=3)
+        open_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=3)
+        snapshot_btn.pack(in_=self.bottom, side="left", fill="both", expand="yes", padx=10, pady=3)
         self.image_rgb_filtered = None
         self.image_rgb_hulls = np.zeros((600, 800, 3), np.uint8)
 
@@ -161,7 +175,6 @@ class BlobDetector():
         if f is None:
             return
         params = f.readlines()
-        print params
         try:
             cv2.setTrackbarPos('HL', 'HSV', int(params[0].split(':')[1]))
             cv2.setTrackbarPos('SL', 'HSV', int(params[1].split(':')[1]))
@@ -172,6 +185,17 @@ class BlobDetector():
         except:
             print "Invalid file structure"
             return
+
+    def slider_callback(self):
+        try:
+            self.hl = self.hl_slider.get()
+            self.sl = self.sl_slider.get()
+            self.vl = self.vl_slider.get()
+            self.hu = self.hu_slider.get()
+            self.su = self.su_slider.get()
+            self.vu = self.vu_slider.get()
+        except AttributeError:
+            pass
 
     def find_area(self, contour):
         moments = cv2.moments(contour)
