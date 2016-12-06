@@ -36,6 +36,7 @@ class BlobDetector():
         self.hu = 180
         self.su = 255
         self.vu = 255
+        self.min_area = 0
 
         self.stopped = False
 
@@ -64,6 +65,8 @@ class BlobDetector():
         self.su_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
         self.vu_slider = tki.Scale(self.root, from_=0, to=255, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback)
         self.vu_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
+        self.area_slider = tki.Scale(self.root, from_=0, to=5000, label="Min Area", length=500, tickinterval=1000, orient="vertical", command=self.slider_callback)
+        self.area_slider.pack(side="right", fill=None, expand="yes", padx=5, pady=2)
         self.hu_slider.set(180)
         self.su_slider.set(255)
         self.vu_slider.set(255)
@@ -77,6 +80,7 @@ class BlobDetector():
 
         self.image_rgb_filtered = None
         self.image_rgb_hulls = np.zeros((600, 800, 3), np.uint8)
+        self.corners = np.zeros((600, 800, 3), np.uint8)
 
     def image_callback(self):
 
@@ -115,11 +119,30 @@ class BlobDetector():
             if len(contours) > 0:
                 hulls = [cv2.convexHull(cnt) for cnt in contours]
                 hulls = sorted(hulls, key=lambda c: cv2.contourArea(c), reverse=True)
+                contours = sorted(contours, key=lambda c: cv2.contourArea(c), reverse=True)
 
-                contour_color = colorsys.hsv_to_rgb(abs(self.hu + self.hl)/360.0, 1, 1)
-                cv2.drawContours(self.image_rgb_hulls, hulls, 0,
-                                 (contour_color[0]*255, contour_color[1]*255, contour_color[2]*255),
-                                 thickness=cv.CV_FILLED)  # draws contour(s)
+                solidity = 0
+                try:
+                    area = cv2.contourArea(contours[0])
+                    hull_area = cv2.contourArea(hulls[0])
+                    solidity = float(area) / hull_area
+                except ZeroDivisionError:
+                    pass
+
+                if cv2.contourArea(hulls[0]) >= self.min_area and 0.4 > solidity > 0.25:
+                    contour_color = colorsys.hsv_to_rgb(abs(self.hu + self.hl)/360.0, 1, 1)
+                    cv2.drawContours(self.image_rgb_hulls, hulls, 0,
+                                     (contour_color[0]*255, contour_color[1]*255, contour_color[2]*255),
+                                     thickness=cv.CV_FILLED)  # draws contour(s)
+                    epsilon = 0.01 * cv2.arcLength(hulls[0], True)
+                    # cv2.drawContours(self.image_rgb_hulls, cv2.approxPolyDP(hulls[0], epsilon, True), -1, (0, 255, 0), thickness=5)
+                    corners = cv.CornerHarris(cv.fromarray(cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY)),
+                                              cv.fromarray(self.corners), 2, k=0.15)
+                    print corners
+                    for i in range(len(corners)):
+                        corners[i] = list(corners[i])
+                    ctr = np.array(corners).reshape((-1, 1, 2)).astype(np.int32)
+                    cv2.drawContours(self.image_rgb_hulls, [ctr], -1, (0, 255, 0), thickness=5)
 
             # TODO add remaining code (corners and calibration) here...
 
@@ -132,10 +155,10 @@ class BlobDetector():
                 if self.panel_right is None or self.panel_left is None:
                     self.panel_left = tki.Label(image=filtered_image)
                     self.panel_left.image = filtered_image
-                    self.panel_left.pack(side="left", padx=80, pady=10)
+                    self.panel_left.pack(side="left", padx=5, pady=10)
                     self.panel_right = tki.Label(image=hull_image)
                     self.panel_right.image = hull_image
-                    self.panel_right.pack(side="right", padx=80, pady=10)
+                    self.panel_right.pack(side="right", padx=5, pady=10)
 
                 else:
                     self.panel_left.configure(image=filtered_image)
@@ -161,7 +184,8 @@ class BlobDetector():
                     "\nvl:" + str(self.vl) + \
                     "\nhu:" + str(self.hu) + \
                     "\nsu:" + str(self.su) + \
-                    "\nvu:" + str(self.vu)
+                    "\nvu:" + str(self.vu) + \
+                    "\narea:" + str(self.min_area)
         f.write(text2save)
         f.close()
 
@@ -177,6 +201,7 @@ class BlobDetector():
             self.hu_slider.set(int(params[3].split(':')[1]))
             self.su_slider.set(int(params[4].split(':')[1]))
             self.vu_slider.set(int(params[5].split(':')[1]))
+            self.area_slider.set(int(params[6].split(":")[1]))
         except:
             print "Invalid file structure"
             return
@@ -189,6 +214,7 @@ class BlobDetector():
             self.hu = self.hu_slider.get()
             self.su = self.su_slider.get()
             self.vu = self.vu_slider.get()
+            self.min_area = self.area_slider.get()
         except AttributeError:
             pass
 
