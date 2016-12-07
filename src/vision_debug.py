@@ -37,6 +37,7 @@ class BlobDetector():
         self.su = 255
         self.vu = 255
         self.min_area = 0
+        self.corner_threshold = 0.01
 
         self.stopped = False
 
@@ -44,8 +45,10 @@ class BlobDetector():
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.top = Frame(self.root)
         self.bottom = Frame(self.root)
+        self.top_right = Frame(self.top)
         self.top.pack(side='top')
         self.bottom.pack(side='bottom', fill='both', expand=True)
+        self.top_right.pack(side='right')
         self.panel_left = None
         self.panel_right = None
 
@@ -66,7 +69,9 @@ class BlobDetector():
         self.vu_slider = tki.Scale(self.root, from_=0, to=255, length=1200, tickinterval=10, orient="horizontal", command=self.slider_callback)
         self.vu_slider.pack(in_=self.top, side="top", fill=None, expand="yes", padx=5, pady=2)
         self.area_slider = tki.Scale(self.root, from_=0, to=5000, label="Min Area", length=500, tickinterval=1000, orient="vertical", command=self.slider_callback)
-        self.area_slider.pack(side="right", fill=None, expand="yes", padx=5, pady=2)
+        self.area_slider.pack(side="right", fill=None, expand="no", padx=5, pady=2)
+        self.threshold_slider = tki.Scale(self.root, from_=1, to=100, label="Corner Threshold", length=300, tickinterval=10, orient="vertical", command=self.slider_callback)
+        self.threshold_slider.pack(in_=self.top_right, side="right", fill=None, expand="no", padx=40, pady=2)
         self.hu_slider.set(180)
         self.su_slider.set(255)
         self.vu_slider.set(255)
@@ -104,18 +109,10 @@ class BlobDetector():
             COLOR_BOUNDS = [np.array([self.hl, self.sl, self.vl]), np.array([self.hu, self.su, self.vu])]
             self.finalMask = cv2.inRange(imageHSV, COLOR_BOUNDS[0], COLOR_BOUNDS[1])
 
-            # TODO call this version 'debug' and create separate version that will use an unchangeable mask:
-            # GREEN_BOUNDS = [np.array([40, 110, 80]), np.array([80, 255, 255])]  # Green filter values
-            # RED_BOUNDS = [np.array([0, 180, 80]), np.array([16, 255, 255])]  # Red filter values
-            # redMask = cv2.inRange(imageHSV, RED_BOUNDS[0], RED_BOUNDS[1])
-            # greenMask = cv2.inRange(imageHSV, GREEN_BOUNDS[0], GREEN_BOUNDS[1])
-            # self.finalMask = cv2.add(redMask, greenMask)
-
             filteredHSV = cv2.bitwise_and(imageHSV, imageHSV, mask=self.finalMask)
             self.image = cv2.cvtColor(filteredHSV, cv2.COLOR_HSV2BGR)
             self.image_rgb_filtered = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
             contours, h = cv2.findContours(self.finalMask, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
-            # print "Found", len(contours), "contours"
             if len(contours) > 0:
                 hulls = [cv2.convexHull(cnt) for cnt in contours]
                 hulls = sorted(hulls, key=lambda c: cv2.contourArea(c), reverse=True)
@@ -134,14 +131,51 @@ class BlobDetector():
                     cv2.drawContours(self.image_rgb_hulls, hulls, 0,
                                      (contour_color[0]*255, contour_color[1]*255, contour_color[2]*255),
                                      thickness=cv.CV_FILLED)  # draws contour(s)
-                    epsilon = 0.01 * cv2.arcLength(hulls[0], True)
-                    # cv2.drawContours(self.image_rgb_hulls, cv2.approxPolyDP(hulls[0], epsilon, True), -1, (0, 255, 0), thickness=5)
-                    gray = cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY)
-                    gray = np.float32(gray)
-                    self.corners = cv2.cornerHarris(gray, 2, 3, 0.15)
-                    cv2.drawContours(self.image_rgb_hulls, self.corners, -1, (0, 255, 0), thickness=5)
 
-            # TODO add remaining code (corners and calibration) here...
+                    # Less precise method for corners:
+                    # epsilon = 0.01 * cv2.arcLength(hulls[0], True)
+                    # cv2.drawContours(self.image_rgb_hulls, cv2.approxPolyDP(hulls[0], epsilon, True),
+                    #                   -1, (0, 255, 0), thickness=5)
+
+                    # Better method:
+                    self.corners = cv2.goodFeaturesToTrack(cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY),
+                                                           4, self.corner_threshold, 10)
+                    corners = []
+                    for corner in self.corners:
+                        x, y = corner.ravel()
+                        cv2.circle(self.image_rgb_hulls, (x, y), self.image_rgb_hulls.shape[0]/150, (255, 0, 0),
+                                   thickness=self.image_rgb_hulls.shape[0]/300)
+                        corners.append(corner.ravel())
+
+                    corners = sorted(corners, key=lambda c: c[0])
+                    corners[:2] = sorted(corners[:2], key=lambda c: c[1])
+                    corners[2:] = sorted(corners[2:], key=lambda c: c[1])
+                    corners = np.array(corners, dtype=np.float32)
+                    coordinate_corners = np.array([np.array([0, 12, 0]),
+                                                   np.array([0, 0, 0]),
+                                                   np.array([20, 12, 0]),
+                                                   np.array([20, 0, 0])], dtype=np.float32)
+
+                    # print cv2.calibrateCamera([coordinate_corners], [corners], self.image_rgb_hulls.shape[:2])
+
+                    camera_matrix = np.array([[1.48113330e+03, 0.00000000e+00, 3.00076323e+02],
+                                             [0.00000000e+00, 1.60430466e+03, 3.99023811e+02],
+                                             [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]], dtype=np.float32)
+
+                    distortion_coefficients = np.array([[-2.09860873e-01, 3.45212161e+01, -5.48597290e-02, -3.77590993e-02, 4.18273084e+03]], dtype=np.float32)
+
+                    rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, corners, camera_matrix, distortion_coefficients)
+                    # print "Rotation Vector:\n" + str(rvec)
+                    # print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
+
+                    axis_pts = cv2.projectPoints(np.array([[0, 0, 0], [0, 6, 0], [6, 0, 0], [0, 0, 6]], dtype=np.float32),
+                                                 rvec, tvec, camera_matrix, distortion_coefficients)[0]
+                    print axis_pts[0].ravel()
+
+                    cv2.line(self.image_rgb_hulls, axis_pts[0], axis_pts[1], (255, 0, 0), thickness=3)
+                    cv2.line(self.image_rgb_hulls, axis_pts[0], axis_pts[2], (0, 255, 0), thickness=3)
+                    cv2.line(self.image_rgb_hulls, axis_pts[0], axis_pts[3], (0, 0, 255), thickness=3)
+
 
             try:
                 hull_image = Image.fromarray(self.image_rgb_hulls)
@@ -152,10 +186,10 @@ class BlobDetector():
                 if self.panel_right is None or self.panel_left is None:
                     self.panel_left = tki.Label(image=filtered_image)
                     self.panel_left.image = filtered_image
-                    self.panel_left.pack(side="left", padx=5, pady=10)
+                    self.panel_left.pack(side="left", padx=10, pady=10)
                     self.panel_right = tki.Label(image=hull_image)
                     self.panel_right.image = hull_image
-                    self.panel_right.pack(side="right", padx=5, pady=10)
+                    self.panel_right.pack(side="left", padx=5, pady=10)
 
                 else:
                     self.panel_left.configure(image=filtered_image)
@@ -182,7 +216,8 @@ class BlobDetector():
                     "\nhu:" + str(self.hu) + \
                     "\nsu:" + str(self.su) + \
                     "\nvu:" + str(self.vu) + \
-                    "\narea:" + str(self.min_area)
+                    "\narea:" + str(self.min_area) + \
+                    "\ncorner_threshold:" + str(self.corner_threshold)
         f.write(text2save)
         f.close()
 
@@ -199,6 +234,7 @@ class BlobDetector():
             self.su_slider.set(int(params[4].split(':')[1]))
             self.vu_slider.set(int(params[5].split(':')[1]))
             self.area_slider.set(int(params[6].split(":")[1]))
+            self.threshold_slider.set(int(params[7].split(":")[1]))
         except:
             print "Invalid file structure"
             return
@@ -212,6 +248,7 @@ class BlobDetector():
             self.su = self.su_slider.get()
             self.vu = self.vu_slider.get()
             self.min_area = self.area_slider.get()
+            self.corner_threshold = self.threshold_slider.get()/100.0
         except AttributeError:
             pass
 
