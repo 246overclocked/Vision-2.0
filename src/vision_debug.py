@@ -162,26 +162,28 @@ class BlobDetector():
                                              [0.00000000e+00, 1.60430466e+03, 3.99023811e+02],
                                              [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]], dtype=np.float32)
 
-                    distortion_coefficients = np.array([[-2.09860873e-01, 3.45212161e+01, -5.48597290e-02, -3.77590993e-02, 4.18273084e+03]], dtype=np.float32)
+                    if len(corners) == 4:
 
-                    rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, corners, camera_matrix, distortion_coefficients)
-                    # print "Rotation Vector:\n" + str(rvec)
-                    # print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
+                        distortion_coefficients = np.array([[-2.09860873e-01, 3.45212161e+01, -5.48597290e-02, -3.77590993e-02, 4.18273084e+03]], dtype=np.float32)
 
-                    axis_pts = cv2.projectPoints(np.array([[0, 0, 0], [0, 6, 0], [6, 0, 0], [0, 0, 6]], dtype=np.float32),
-                                                 rvec, tvec, camera_matrix, distortion_coefficients)[0]
-                    origin = (int(axis_pts[0].ravel()[0]), int(axis_pts[0].ravel()[1]))
-                    pt1 = (int(axis_pts[1].ravel()[0]), int(axis_pts[1].ravel()[1]))
-                    pt2 = (int(axis_pts[2].ravel()[0]), int(axis_pts[2].ravel()[1]))
-                    pt3 = (int(axis_pts[3].ravel()[0]), int(axis_pts[3].ravel()[1]))
+                        rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, corners, camera_matrix, distortion_coefficients)
+                        print "Rotation Vector:\n" + str(rvec)
+                        print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
 
-                    try:
-                        cv2.line(self.image_rgb_hulls, origin, pt1, (0, 255, 0), thickness=3)
-                        cv2.line(self.image_rgb_hulls, origin, pt2, (255, 0, 0), thickness=3)
-                        cv2.line(self.image_rgb_hulls, origin, pt3, (0, 0, 255), thickness=3)
-                    except OverflowError:
-                        print "Invalid corner configuration"
-                        pass
+                        axis_pts = cv2.projectPoints(np.array([[0, 0, 0], [0, 6, 0], [6, 0, 0], [0, 0, 6]], dtype=np.float32),
+                                                     rvec, tvec, camera_matrix, distortion_coefficients)[0]
+                        origin = (int(axis_pts[0].ravel()[0]), int(axis_pts[0].ravel()[1]))
+                        pt1 = (int(axis_pts[1].ravel()[0]), int(axis_pts[1].ravel()[1]))
+                        pt2 = (int(axis_pts[2].ravel()[0]), int(axis_pts[2].ravel()[1]))
+                        pt3 = (int(axis_pts[3].ravel()[0]), int(axis_pts[3].ravel()[1]))
+
+                        try:
+                            cv2.line(self.image_rgb_hulls, origin, pt1, (0, 255, 0), thickness=3)
+                            cv2.line(self.image_rgb_hulls, origin, pt2, (255, 0, 0), thickness=3)
+                            cv2.line(self.image_rgb_hulls, origin, pt3, (0, 0, 255), thickness=3)
+                        except OverflowError:
+                            print "Invalid corner configuration"
+                            pass
 
             try:
                 hull_image = Image.fromarray(self.image_rgb_hulls)
