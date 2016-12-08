@@ -113,6 +113,19 @@ class BlobDetector():
             self.image = cv2.cvtColor(filteredHSV, cv2.COLOR_HSV2BGR)
             self.image_rgb_filtered = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
             contours, h = cv2.findContours(self.finalMask, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
+
+            # corners_found, chessboard_corners = cv2.findChessboardCorners(self.image_rgb_filtered, (8, 7), flags=4)
+            # cv2.drawChessboardCorners(self.image_rgb_filtered, (8, 7), chessboard_corners, corners_found)
+            #
+            # if corners_found:
+            #     coordinate_corners = []
+            #     for y in range(7):
+            #         for x in range(8):
+            #             coordinate_corners.append([x, y, 0])
+            #
+            #     calibration = cv2.calibrateCamera([np.array(coordinate_corners, dtype=np.float32)], [np.array(chessboard_corners, dtype=np.float32)], self.image_rgb_hulls.shape[:2])
+            #     print calibration
+
             if len(contours) > 0:
                 hulls = [cv2.convexHull(cnt) for cnt in contours]
                 hulls = sorted(hulls, key=lambda c: cv2.contourArea(c), reverse=True)
@@ -133,13 +146,15 @@ class BlobDetector():
                                      thickness=cv.CV_FILLED)  # draws contour(s)
 
                     # Less precise method for corners:
-                    # epsilon = 0.01 * cv2.arcLength(hulls[0], True)
-                    # cv2.drawContours(self.image_rgb_hulls, cv2.approxPolyDP(hulls[0], epsilon, True),
-                    #                   -1, (0, 255, 0), thickness=5)
+                    epsilon = 0.01 * cv2.arcLength(hulls[0], True)
+                    cv2.drawContours(self.image_rgb_hulls, cv2.approxPolyDP(hulls[0], epsilon, True),
+                                      -1, (0, 255, 0), thickness=5)
+                    self.corners = cv2.approxPolyDP(hulls[0], epsilon, True)
+                    print self.corners
 
                     # Better method:
-                    self.corners = cv2.goodFeaturesToTrack(cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY),
-                                                           4, self.corner_threshold, 10)
+                    # self.corners = cv2.goodFeaturesToTrack(cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY),
+                    #                                        4, self.corner_threshold, 10)
                     corners = []
                     for corner in self.corners:
                         x, y = corner.ravel()
@@ -156,19 +171,20 @@ class BlobDetector():
                                                    np.array([20, 12, 0]),
                                                    np.array([20, 0, 0])], dtype=np.float32)
 
-                    # print cv2.calibrateCamera([coordinate_corners], [corners], self.image_rgb_hulls.shape[:2])
+                    # calibration = cv2.calibrateCamera([coordinate_corners], [corners], self.image_rgb_hulls.shape[:2])
 
-                    camera_matrix = np.array([[1.48113330e+03, 0.00000000e+00, 3.00076323e+02],
-                                             [0.00000000e+00, 1.60430466e+03, 3.99023811e+02],
-                                             [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]], dtype=np.float32)
+                    camera_matrix = np.array([[351.96591817, 0., 318.85365638],
+                                             [0., 356.36889205, 446.57879869],
+                                             [0., 0., 1.]], dtype=np.float32)
+
+                    distortion_coefficients = np.array([[-0.12559246, 0.16263054, -0.03021033, 0.0249903, -0.18684171]], dtype=np.float32)
 
                     if len(corners) == 4:
 
-                        distortion_coefficients = np.array([[-2.09860873e-01, 3.45212161e+01, -5.48597290e-02, -3.77590993e-02, 4.18273084e+03]], dtype=np.float32)
-
-                        rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, corners, camera_matrix, distortion_coefficients)
-                        print "Rotation Vector:\n" + str(rvec)
-                        print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
+                        # rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, corners, camera_matrix, distortion_coefficients)
+                        _, rvec, tvec = cv2.solvePnP(coordinate_corners, corners, camera_matrix, distortion_coefficients)
+                        # print "Rotation Vector:\n" + str(rvec)
+                        # print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
 
                         axis_pts = cv2.projectPoints(np.array([[0, 0, 0], [0, 6, 0], [6, 0, 0], [0, 0, 6]], dtype=np.float32),
                                                      rvec, tvec, camera_matrix, distortion_coefficients)[0]
@@ -176,6 +192,7 @@ class BlobDetector():
                         pt1 = (int(axis_pts[1].ravel()[0]), int(axis_pts[1].ravel()[1]))
                         pt2 = (int(axis_pts[2].ravel()[0]), int(axis_pts[2].ravel()[1]))
                         pt3 = (int(axis_pts[3].ravel()[0]), int(axis_pts[3].ravel()[1]))
+                        # print (origin, pt1, pt2, pt3)
 
                         try:
                             cv2.line(self.image_rgb_hulls, origin, pt1, (0, 255, 0), thickness=3)
