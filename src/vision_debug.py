@@ -96,7 +96,7 @@ class BlobDetector():
             print "ERROR RETRIEVING STREAM!\nExiting..."
             return
         else:
-            print "Success!\nAnalyzing stream...     (Press ESC to quit!)"
+            print "Success!\nAnalyzing stream..."
 
         while not self.stopped:
             retval, frame = cap.read()
