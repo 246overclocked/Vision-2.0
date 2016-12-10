@@ -85,7 +85,10 @@ class BlobDetector():
 
         self.image_rgb_filtered = None
         self.image_rgb_hulls = np.zeros((600, 800, 3), np.float32)
+        self.internal_rgb_hulls = np.zeros((600, 800, 3), np.float32)
         self.corners = np.zeros(self.image_rgb_hulls.size, self.image_rgb_hulls.dtype)
+        self.corners_internal = np.zeros(self.image_rgb_hulls.size, self.image_rgb_hulls.dtype)
+        self.internal = np.zeros((600, 800, 3), np.float32)
 
     def image_callback(self):
 
@@ -106,12 +109,13 @@ class BlobDetector():
 
             imageHSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             self.image_rgb_hulls = np.zeros((self.image.shape[0], self.image.shape[1], 3), np.uint8)
+            self.internal_rgb_hulls = np.zeros((self.image.shape[0], self.image.shape[1], 3), np.uint8)
+            self.internal = np.zeros((self.image.shape[0], self.image.shape[1], 3), np.uint8)
             COLOR_BOUNDS = [np.array([self.hl, self.sl, self.vl]), np.array([self.hu, self.su, self.vu])]
             self.finalMask = cv2.inRange(imageHSV, COLOR_BOUNDS[0], COLOR_BOUNDS[1])
-
             filteredHSV = cv2.bitwise_and(imageHSV, imageHSV, mask=self.finalMask)
-            self.image = cv2.cvtColor(filteredHSV, cv2.COLOR_HSV2BGR)
-            self.image_rgb_filtered = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+            self.image_rgb_filtered = cv2.cvtColor(filteredHSV, cv2.COLOR_HSV2RGB)
+            self.internal = cv2.cvtColor(self.internal, cv2.COLOR_BGR2GRAY)
             contours, h = cv2.findContours(self.finalMask, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
 
             # corners_found, chessboard_corners = cv2.findChessboardCorners(self.image_rgb_filtered, (8, 7), flags=4)
@@ -144,17 +148,28 @@ class BlobDetector():
                     cv2.drawContours(self.image_rgb_hulls, hulls, 0,
                                      (contour_color[0]*255, contour_color[1]*255, contour_color[2]*255),
                                      thickness=cv.CV_FILLED)  # draws contour(s)
+                    cv2.drawContours(self.internal, contours, 0, (255, 0, 0), thickness=cv.CV_FILLED)
+                    hulls_bitwise = cv2.inRange(self.image_rgb_hulls,
+                                                np.array([contour_color[0]*255-1, contour_color[1]*255-1, contour_color[2]*255-1]),
+                                                np.array([contour_color[0]*255+1, contour_color[1]*255+1, contour_color[2]*255+1]))
+                    self.internal = cv2.dilate(self.internal, (10, 10), iterations=20)
+                    hulls_bitwise = cv2.erode(hulls_bitwise, (1, 1), iterations=2)
+                    difference = cv2.subtract(hulls_bitwise, self.internal)
+                    internal_contours, h = cv2.findContours(difference, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
+                    internal_hulls = [cv2.convexHull(cnt) for cnt in internal_contours]
+                    internal_hulls = sorted(internal_hulls, key=lambda c: cv2.contourArea(c), reverse=True)
+                    cv2.drawContours(self.internal_rgb_hulls, internal_hulls, 0, (255, 0, 0), thickness=cv.CV_FILLED)
+
 
                     # Less precise method for corners:
-                    epsilon = 0.01 * cv2.arcLength(hulls[0], True)
-                    cv2.drawContours(self.image_rgb_hulls, cv2.approxPolyDP(hulls[0], epsilon, True),
-                                      -1, (0, 255, 0), thickness=5)
-                    self.corners = cv2.approxPolyDP(hulls[0], epsilon, True)
-                    print self.corners
+                    # epsilon = 0.01 * cv2.arcLength(hulls[0], True)
+                    # cv2.drawContours(self.image_rgb_hulls, cv2.approxPolyDP(hulls[0], epsilon, True),
+                    #                  -1, (0, 255, 0), thickness=5)
+                    # self.corners = cv2.approxPolyDP(hulls[0], epsilon, True)
 
                     # Better method:
-                    # self.corners = cv2.goodFeaturesToTrack(cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY),
-                    #                                        4, self.corner_threshold, 10)
+                    self.corners = cv2.goodFeaturesToTrack(cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY),
+                                                           4, self.corner_threshold, 10)
                     corners = []
                     for corner in self.corners:
                         x, y = corner.ravel()
@@ -166,13 +181,35 @@ class BlobDetector():
                     corners[:2] = sorted(corners[:2], key=lambda c: c[1])
                     corners[2:] = sorted(corners[2:], key=lambda c: c[1])
                     corners = np.array(corners, dtype=np.float32)
+
+                    self.corners_internal = cv2.goodFeaturesToTrack(cv2.cvtColor(self.internal_rgb_hulls, cv2.COLOR_RGB2GRAY),
+                                                                                 4, self.corner_threshold, 10)
+                    internal_corners = []
+                    for corner in self.corners_internal:
+                        x, y = corner.ravel()
+                        cv2.circle(self.image_rgb_hulls, (x, y), self.image_rgb_hulls.shape[0] / 150, (255, 0, 0),
+                                   thickness=self.image_rgb_hulls.shape[0] / 300)
+                        internal_corners.append(corner.ravel())
+
+                    internal_corners = sorted(internal_corners, key=lambda c: c[0])
+                    internal_corners[:2] = sorted(internal_corners[:2], key=lambda c: c[1])
+                    internal_corners[2:] = sorted(internal_corners[2:], key=lambda c: c[1])
+                    internal_corners = np.array(internal_corners, dtype=np.float32)
+
+                    all_corners = np.concatenate((corners, internal_corners), axis=0)
+
                     coordinate_corners = np.array([np.array([0, 12, 0]),
                                                    np.array([0, 0, 0]),
                                                    np.array([20, 12, 0]),
-                                                   np.array([20, 0, 0])], dtype=np.float32)
+                                                   np.array([20, 0, 0]),
+                                                   np.array([2, 12, 0]),
+                                                   np.array([2, 2, 0]),
+                                                   np.array([18, 12, 0]),
+                                                   np.array([18, 2, 0])], dtype=np.float32)
 
-                    # calibration = cv2.calibrateCamera([coordinate_corners], [corners], self.image_rgb_hulls.shape[:2])
-
+                    # calibration = cv2.calibrateCamera([coordinate_corners], [all_corners], self.image_rgb_hulls.shape[:2])
+                    # camera_matrix = calibration[1]
+                    # distortion_coefficients = calibration[2]
                     camera_matrix = np.array([[351.96591817, 0., 318.85365638],
                                              [0., 356.36889205, 446.57879869],
                                              [0., 0., 1.]], dtype=np.float32)
@@ -181,8 +218,8 @@ class BlobDetector():
 
                     if len(corners) == 4:
 
-                        # rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, corners, camera_matrix, distortion_coefficients)
-                        _, rvec, tvec = cv2.solvePnP(coordinate_corners, corners, camera_matrix, distortion_coefficients)
+                        rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
+                        # _, rvec, tvec = cv2.solvePnP(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
                         # print "Rotation Vector:\n" + str(rvec)
                         # print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
 
