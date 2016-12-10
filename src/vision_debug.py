@@ -153,7 +153,7 @@ class BlobDetector():
                                                 np.array([contour_color[0]*255-1, contour_color[1]*255-1, contour_color[2]*255-1]),
                                                 np.array([contour_color[0]*255+1, contour_color[1]*255+1, contour_color[2]*255+1]))
                     self.internal = cv2.dilate(self.internal, (10, 10), iterations=20)
-                    hulls_bitwise = cv2.erode(hulls_bitwise, (1, 1), iterations=2)
+                    hulls_bitwise = cv2.erode(hulls_bitwise, (10, 10), iterations=20)
                     difference = cv2.subtract(hulls_bitwise, self.internal)
                     internal_contours, h = cv2.findContours(difference, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
                     internal_hulls = [cv2.convexHull(cnt) for cnt in internal_contours]
@@ -181,6 +181,7 @@ class BlobDetector():
                     corners[:2] = sorted(corners[:2], key=lambda c: c[1])
                     corners[2:] = sorted(corners[2:], key=lambda c: c[1])
                     corners = np.array(corners, dtype=np.float32)
+                    cv2.drawContours(self.image_rgb_hulls, internal_hulls, 0, (255, 0, 0), thickness=cv.CV_FILLED)
 
                     self.corners_internal = cv2.goodFeaturesToTrack(cv2.cvtColor(self.internal_rgb_hulls, cv2.COLOR_RGB2GRAY),
                                                                                  4, self.corner_threshold, 10)
@@ -202,9 +203,9 @@ class BlobDetector():
                                                    np.array([0, 0, 0]),
                                                    np.array([20, 12, 0]),
                                                    np.array([20, 0, 0]),
-                                                   np.array([2, 12, 0]),
+                                                   np.array([2, 10, 0]),
                                                    np.array([2, 2, 0]),
-                                                   np.array([18, 12, 0]),
+                                                   np.array([18, 10, 0]),
                                                    np.array([18, 2, 0])], dtype=np.float32)
 
                     # calibration = cv2.calibrateCamera([coordinate_corners], [all_corners], self.image_rgb_hulls.shape[:2])
@@ -279,7 +280,7 @@ class BlobDetector():
                     "\nsu:" + str(self.su) + \
                     "\nvu:" + str(self.vu) + \
                     "\narea:" + str(self.min_area) + \
-                    "\ncorner_threshold:" + str(self.corner_threshold)
+                    "\ncorner_threshold:" + str(int(self.corner_threshold*100))
         f.write(text2save)
         f.close()
 
