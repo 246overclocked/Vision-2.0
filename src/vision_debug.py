@@ -219,8 +219,8 @@ class BlobDetector():
 
                     if len(corners) == 4:
 
-                        rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
-                        # _, rvec, tvec = cv2.solvePnP(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
+                        # rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
+                        _, rvec, tvec = cv2.solvePnP(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
                         # print "Rotation Vector:\n" + str(rvec)
                         # print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
 

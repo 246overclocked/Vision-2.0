@@ -1,0 +1,8 @@
+hl:75
+sl:55
+vl:140
+hu:95
+su:255
+vu:255
+area:0
+corner_threshold:0.01
