@@ -188,7 +188,7 @@ class BlobDetector():
                     internal_corners = []
                     for corner in self.corners_internal:
                         x, y = corner.ravel()
-                        cv2.circle(self.image_rgb_hulls, (x, y), self.image_rgb_hulls.shape[0] / 150, (255, 0, 0),
+                        cv2.circle(self.image_rgb_hulls, (x, y), self.image_rgb_hulls.shape[0] / 150, (0, 255, 0),
                                    thickness=self.image_rgb_hulls.shape[0] / 300)
                         internal_corners.append(corner.ravel())
 
@@ -197,30 +197,23 @@ class BlobDetector():
                     internal_corners[2:] = sorted(internal_corners[2:], key=lambda c: c[1])
                     internal_corners = np.array(internal_corners, dtype=np.float32)
 
-                    all_corners = np.concatenate((corners, internal_corners), axis=0)
-
-                    coordinate_corners = np.array([np.array([0, 12, 0]),
-                                                   np.array([0, 0, 0]),
-                                                   np.array([20, 12, 0]),
-                                                   np.array([20, 0, 0]),
-                                                   np.array([2, 10, 0]),
+                    coordinate_corners = np.array([np.array([2, 10, 0]),
                                                    np.array([2, 2, 0]),
                                                    np.array([18, 10, 0]),
                                                    np.array([18, 2, 0])], dtype=np.float32)
 
-                    # calibration = cv2.calibrateCamera([coordinate_corners], [all_corners], self.image_rgb_hulls.shape[:2])
-                    # camera_matrix = calibration[1]
-                    # distortion_coefficients = calibration[2]
-                    camera_matrix = np.array([[351.96591817, 0., 318.85365638],
-                                             [0., 356.36889205, 446.57879869],
+                    # calibration = cv2.calibrateCamera([coordinate_corners], [internal_corners], self.image_rgb_hulls.shape[:2])
+
+                    camera_matrix = np.array([[6.5746697944293521e+002, 0., 3.1950000000000000e+002],
+                                             [0., 6.5746697944293521e+002, 2.3950000000000000e+002],
                                              [0., 0., 1.]], dtype=np.float32)
 
-                    distortion_coefficients = np.array([[-0.12559246, 0.16263054, -0.03021033, 0.0249903, -0.18684171]], dtype=np.float32)
+                    distortion_coefficients = np.array([[-4.1802327176423804e-001, 5.0715244063187526e-001, 0., 0., -5.7843597214487474e-001]], dtype=np.float32)
 
-                    if len(corners) == 4:
+                    if len(internal_corners) == 4:
 
-                        # rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
-                        _, rvec, tvec = cv2.solvePnP(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
+                        rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, internal_corners, camera_matrix, distortion_coefficients)
+                        # _, rvec, tvec = cv2.solvePnP(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
                         # print "Rotation Vector:\n" + str(rvec)
                         # print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
 
