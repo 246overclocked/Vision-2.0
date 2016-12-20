@@ -187,40 +187,89 @@ class BlobDetector():
                                                                                  4, self.corner_threshold, 10)
                     internal_corners = []
                     for corner in self.corners_internal:
-                        x, y = corner.ravel()
-                        cv2.circle(self.image_rgb_hulls, (x, y), self.image_rgb_hulls.shape[0] / 150, (255, 0, 0),
-                                   thickness=self.image_rgb_hulls.shape[0] / 300)
                         internal_corners.append(corner.ravel())
 
                     internal_corners = sorted(internal_corners, key=lambda c: c[0])
                     internal_corners[:2] = sorted(internal_corners[:2], key=lambda c: c[1])
                     internal_corners[2:] = sorted(internal_corners[2:], key=lambda c: c[1])
+                    left_row_margin = (internal_corners[1][1] - internal_corners[0][1])/4
+                    left_first_row_y = left_row_margin + internal_corners[0][1]
+                    left_second_row_y = left_row_margin * 2 + internal_corners[0][1]
+                    left_third_row_y = left_row_margin * 3 + internal_corners[0][1]
+                    right_row_margin = (internal_corners[3][1] - internal_corners[2][1])/4
+                    right_first_row_y = right_row_margin + internal_corners[2][1]
+                    right_second_row_y = right_row_margin * 2 + internal_corners[2][1]
+                    right_third_row_y = right_row_margin * 3 + internal_corners[2][1]
+                    left_column_margin = (internal_corners[0][0] - internal_corners[1][0])/4
+                    left_first_row_x = left_column_margin * 3 + internal_corners[1][0]
+                    left_second_row_x = left_column_margin * 2 + internal_corners[1][0]
+                    left_third_row_x = left_column_margin + internal_corners[1][0]
+                    right_column_margin = (internal_corners[2][0] - internal_corners[3][0])/4
+                    right_first_row_x = right_column_margin * 3 + internal_corners[3][0]
+                    right_second_row_x = right_column_margin * 2 + internal_corners[3][0]
+                    right_third_row_x = right_column_margin + internal_corners[3][0]
+                    internal_corners.append(np.array([left_first_row_x, left_first_row_y], dtype=np.float32))
+                    internal_corners.append(np.array([left_second_row_x, left_second_row_y], dtype=np.float32))
+                    internal_corners.append(np.array([left_third_row_x, left_third_row_y], dtype=np.float32))
+                    internal_corners.append(np.array([right_first_row_x, right_first_row_y], dtype=np.float32))
+                    internal_corners.append(np.array([right_second_row_x, right_second_row_y], dtype=np.float32))
+                    internal_corners.append(np.array([right_third_row_x, right_third_row_y], dtype=np.float32))
+                    second_col_first_row_x = (left_first_row_x - right_first_row_x) / 3 + right_first_row_x
+                    third_col_first_row_x = 2 * (left_first_row_x - right_first_row_x) / 3 + right_first_row_x
+                    second_col_first_row_y = (left_first_row_y - right_first_row_y) / 3 + right_first_row_y
+                    third_col_first_row_y = 2 * (left_first_row_y - right_first_row_y) / 3 + right_first_row_y
+                    second_col_second_row_x = (left_second_row_x - right_second_row_x) / 3 + right_second_row_x
+                    third_col_second_row_x = 2 * (left_second_row_x - right_second_row_x) / 3 + right_second_row_x
+                    second_col_second_row_y = (left_second_row_y - right_second_row_y) / 3 + right_second_row_y
+                    third_col_second_row_y = 2 * (left_second_row_y - right_second_row_y) / 3 + right_second_row_y
+                    second_col_third_row_x = (left_third_row_x - right_third_row_x) / 3 + right_third_row_x
+                    third_col_third_row_x = 2 * (left_third_row_x - right_third_row_x) / 3 + right_third_row_x
+                    second_col_third_row_y = (left_third_row_y - right_third_row_y) / 3 + right_third_row_y
+                    third_col_third_row_y = 2 * (left_third_row_y - right_third_row_y) / 3 + right_third_row_y
+                    internal_corners.append(np.array([second_col_first_row_x, second_col_first_row_y], dtype=np.float32))
+                    internal_corners.append(np.array([third_col_first_row_x, third_col_first_row_y], dtype=np.float32))
+                    internal_corners.append(np.array([second_col_second_row_x, second_col_second_row_y], dtype=np.float32))
+                    internal_corners.append(np.array([third_col_second_row_x, third_col_second_row_y], dtype=np.float32))
+                    internal_corners.append(np.array([second_col_third_row_x, second_col_third_row_y], dtype=np.float32))
+                    internal_corners.append(np.array([third_col_third_row_x, third_col_third_row_y], dtype=np.float32))
                     internal_corners = np.array(internal_corners, dtype=np.float32)
 
-                    all_corners = np.concatenate((corners, internal_corners), axis=0)
+                    for corner in internal_corners:
+                        x, y = corner[0], corner[1]
+                        cv2.circle(self.image_rgb_hulls, (x, y), self.image_rgb_hulls.shape[0] / 150, (0, 255, 0),
+                                   thickness=self.image_rgb_hulls.shape[0] / 300)
 
-                    coordinate_corners = np.array([np.array([0, 12, 0]),
-                                                   np.array([0, 0, 0]),
-                                                   np.array([20, 12, 0]),
-                                                   np.array([20, 0, 0]),
-                                                   np.array([2, 10, 0]),
+                    coordinate_corners = np.array([np.array([2, 10, 0]),
                                                    np.array([2, 2, 0]),
                                                    np.array([18, 10, 0]),
-                                                   np.array([18, 2, 0])], dtype=np.float32)
+                                                   np.array([18, 2, 0]),
+                                                   np.array([2, 8, 0]),
+                                                   np.array([2, 6, 0]),
+                                                   np.array([2, 4, 0]),
+                                                   np.array([18, 8, 0]),
+                                                   np.array([18, 6, 0]),
+                                                   np.array([18, 4, 0]),
+                                                   np.array([7.33, 8, 0]),
+                                                   np.array([12.66, 8, 0]),
+                                                   np.array([7.33, 6, 0]),
+                                                   np.array([12.66, 6, 0]),
+                                                   np.array([7.33, 4, 0]),
+                                                   np.array([12.66, 4, 0])], dtype=np.float32)
 
                     # calibration = cv2.calibrateCamera([coordinate_corners], [all_corners], self.image_rgb_hulls.shape[:2])
                     # camera_matrix = calibration[1]
                     # distortion_coefficients = calibration[2]
-                    camera_matrix = np.array([[351.96591817, 0., 318.85365638],
-                                             [0., 356.36889205, 446.57879869],
+
+                    camera_matrix = np.array([[6.5746697944293521e+002, 0., 3.1950000000000000e+002],
+                                             [0., 6.5746697944293521e+002, 2.3950000000000000e+002],
                                              [0., 0., 1.]], dtype=np.float32)
 
-                    distortion_coefficients = np.array([[-0.12559246, 0.16263054, -0.03021033, 0.0249903, -0.18684171]], dtype=np.float32)
+                    distortion_coefficients = np.array([[-4.1802327176423804e-001, 5.0715244063187526e-001, 0., 0., -5.7843597214487474e-001]], dtype=np.float32)
 
-                    if len(corners) == 4:
+                    if len(internal_corners) == 16:
 
-                        # rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
-                        _, rvec, tvec = cv2.solvePnP(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
+                        rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, internal_corners, camera_matrix, distortion_coefficients)
+                        # _, rvec, tvec = cv2.solvePnP(coordinate_corners, internal_corners, camera_matrix, distortion_coefficients)
                         # print "Rotation Vector:\n" + str(rvec)
                         # print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
 
@@ -230,7 +279,6 @@ class BlobDetector():
                         pt1 = (int(axis_pts[1].ravel()[0]), int(axis_pts[1].ravel()[1]))
                         pt2 = (int(axis_pts[2].ravel()[0]), int(axis_pts[2].ravel()[1]))
                         pt3 = (int(axis_pts[3].ravel()[0]), int(axis_pts[3].ravel()[1]))
-                        # print (origin, pt1, pt2, pt3)
 
                         try:
                             cv2.line(self.image_rgb_hulls, origin, pt1, (0, 255, 0), thickness=3)
