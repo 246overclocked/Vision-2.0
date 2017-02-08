@@ -94,7 +94,7 @@ class BlobDetector():
 
         print("Hello, OpenCV!\nLoading feed...")
         # be sure to enter the correct camera ip here!
-        cap = cv2.VideoCapture("http://root:underclocked@128.197.50.90/mjpg/video.mjpg")
+        cap = cv2.VideoCapture("http://root:underclocked@128.197.50.26/mjpg/video.mjpg")
         if not cap.isOpened():
             print "ERROR RETRIEVING STREAM!\nExiting..."
             return
@@ -117,18 +117,6 @@ class BlobDetector():
             self.image_rgb_filtered = cv2.cvtColor(filteredHSV, cv2.COLOR_HSV2RGB)
             self.internal = cv2.cvtColor(self.internal, cv2.COLOR_BGR2GRAY)
             contours, h = cv2.findContours(self.finalMask, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
-
-            # corners_found, chessboard_corners = cv2.findChessboardCorners(self.image_rgb_filtered, (8, 7), flags=4)
-            # cv2.drawChessboardCorners(self.image_rgb_filtered, (8, 7), chessboard_corners, corners_found)
-            #
-            # if corners_found:
-            #     coordinate_corners = []
-            #     for y in range(7):
-            #         for x in range(8):
-            #             coordinate_corners.append([x, y, 0])
-            #
-            #     calibration = cv2.calibrateCamera([np.array(coordinate_corners, dtype=np.float32)], [np.array(chessboard_corners, dtype=np.float32)], self.image_rgb_hulls.shape[:2])
-            #     print calibration
 
             if len(contours) > 0:
                 hulls = [cv2.convexHull(cnt) for cnt in contours]
