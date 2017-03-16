@@ -94,10 +94,10 @@ class BlobDetector:
         # UDP STUFF
         print("Opening network socket...")
         host_ip = socket.gethostname()
-        send_port = 246
+        send_port = 5801
         send_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         send_socket.connect((host_ip, send_port))
-        print("Opened socket at port 246!")
+        print("Opened socket at port 5801!")
 
         print("Hello, OpenCV!\nLoading feed...")
         # be sure to enter the correct camera ip here!
@@ -129,6 +129,8 @@ class BlobDetector:
 
                 solidity1 = 0
                 solidity2 = 0
+                hull_area1 = 0
+                hull_area2 = 0
                 try:
                     area1 = cv2.contourArea(contours[0])
                     hull_area1 = cv2.contourArea(hulls[0])
@@ -139,7 +141,7 @@ class BlobDetector:
                 except ZeroDivisionError:
                     pass
 
-                if solidity1 > 0.8 and solidity2 > 0.8:
+                if solidity1 > 0.8 and solidity2 > 0.8 and hull_area1 > self.min_area and hull_area2 > self.min_area:
                     contour_color = colorsys.hsv_to_rgb(abs(self.hu + self.hl)/360.0, 1, 1)
                     cv2.drawContours(self.image_rgb_hulls, hulls, 0,
                                      (contour_color[0]*255, contour_color[1]*255, contour_color[2]*255),
@@ -149,45 +151,55 @@ class BlobDetector:
                                      thickness=cv.CV_FILLED)  # draws contour 2
 
                     self.corners = cv2.goodFeaturesToTrack(cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY),
-                                                           4, self.corner_threshold, 10)
-                    corners = []
-                    for corner in self.corners:
-                        x, y = corner.ravel()
-                        cv2.circle(self.image_rgb_hulls, (x, y), self.image_rgb_hulls.shape[0]/150, (255, 0, 0),
-                                   thickness=self.image_rgb_hulls.shape[0]/300)
-                        corners.append(corner.ravel())
+                                                           8, self.corner_threshold, 10)
 
-                    corners = sorted(corners, key=lambda c: c[0])
-                    corners[:2] = sorted(corners[:2], key=lambda c: c[1])
-                    corners[2:4] = sorted(corners[2:4], key=lambda c: c[1])
-                    corners[4:6] = sorted(corners[4:6], key=lambda c: c[1])
-                    corners[6:] = sorted(corners[6:], key=lambda c: c[1])
+                    # The less precise (still fine) alternative method for finding corners:
 
-                    corners = np.array(corners, dtype=np.float32)
+                    # epsilon = self.corner_threshold * cv2.arcLength(hulls[0], True)
+                    # self.corners = cv2.approxPolyDP(hulls[0], epsilon, True)
+                    #
+                    # epsilon = self.corner_threshold * cv2.arcLength(hulls[1], True)
+                    # self.corners = np.append(self.corners, cv2.approxPolyDP(hulls[1], epsilon, True), axis=0)
 
-                    coordinate_corners = np.array([np.array([0, 5, 0]),
-                                                   np.array([0, 0, 0]),
-                                                   np.array([2, 5, 0]),
-                                                   np.array([2, 0, 0]),
-                                                   np.array([8, 5, 0]),
-                                                   np.array([8, 0, 0]),
-                                                   np.array([10, 5, 0]),
-                                                   np.array([10, 0, 0])], dtype=np.float32)
+                    if len(self.corners) == 8:
 
-                    camera_matrix = np.array([[560.477787, 0.000000, 333.440324],
-                                             [0.000000, 564.670012, 257.144953],
-                                             [0.000000, 0.000000, 1.000000]], dtype=np.float32)
+                        corners = []
 
-                    distortion_coefficients = np.array([[-0.321453, 0.145752, 0.000272, 0.002556, 0.000000]], dtype=np.float32)
+                        for corner in self.corners:
+                            x, y = corner.ravel()
+                            cv2.circle(self.image_rgb_hulls, (x, y), self.image_rgb_hulls.shape[0]/150, (255, 0, 0),
+                                       thickness=self.image_rgb_hulls.shape[0]/300)
+                            corners.append(corner.ravel())
 
-                    if len(corners) == 8:
+                        corners = sorted(corners, key=lambda c: c[0])
+                        corners[:2] = sorted(corners[:2], key=lambda c: c[1])
+                        corners[2:4] = sorted(corners[2:4], key=lambda c: c[1])
+                        corners[4:6] = sorted(corners[4:6], key=lambda c: c[1])
+                        corners[6:] = sorted(corners[6:], key=lambda c: c[1])
+
+                        corners = np.array(corners, dtype=np.float32)
+
+                        coordinate_corners = np.array([np.array([0, 5, 0]),
+                                                       np.array([0, 0, 0]),
+                                                       np.array([2, 5, 0]),
+                                                       np.array([2, 0, 0]),
+                                                       np.array([8, 5, 0]),
+                                                       np.array([8, 0, 0]),
+                                                       np.array([10, 5, 0]),
+                                                       np.array([10, 0, 0])], dtype=np.float32)
+
+                        camera_matrix = np.array([[560.477787, 0.000000, 333.440324],
+                                                 [0.000000, 564.670012, 257.144953],
+                                                 [0.000000, 0.000000, 1.000000]], dtype=np.float32)
+
+                        distortion_coefficients = np.array([[-0.321453, 0.145752, 0.000272, 0.002556, 0.000000]], dtype=np.float32)
 
                         rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, corners, camera_matrix, distortion_coefficients)
-                        # _, rvec, tvec = cv2.solvePnP(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
+                        # _, rvec, tvec = cv2.solvePnP(coordinate_corners, corners, camera_matrix, distortion_coefficients)
                         # print "Rotation Vector:\n" + str(rvec)
                         # print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
 
-                        msg = struct.pack("6f", ...)
+                        msg = struct.pack("6f", rvec[0][0], rvec[1][0], rvec[2][0], tvec[0][0], tvec[1][0], tvec[2][0])
                         send_socket.send(msg)
 
                         axis_pts = cv2.projectPoints(np.array([[0, 0, 0], [0, 6, 0], [6, 0, 0], [0, 0, 6]], dtype=np.float32),
