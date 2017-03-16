@@ -85,10 +85,7 @@ class BlobDetector():
 
         self.image_rgb_filtered = None
         self.image_rgb_hulls = np.zeros((600, 800, 3), np.float32)
-        self.internal_rgb_hulls = np.zeros((600, 800, 3), np.float32)
         self.corners = np.zeros(self.image_rgb_hulls.size, self.image_rgb_hulls.dtype)
-        self.corners_internal = np.zeros(self.image_rgb_hulls.size, self.image_rgb_hulls.dtype)
-        self.internal = np.zeros((600, 800, 3), np.float32)
 
     def image_callback(self):
 
@@ -109,53 +106,38 @@ class BlobDetector():
 
             imageHSV = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             self.image_rgb_hulls = np.zeros((self.image.shape[0], self.image.shape[1], 3), np.uint8)
-            self.internal_rgb_hulls = np.zeros((self.image.shape[0], self.image.shape[1], 3), np.uint8)
-            self.internal = np.zeros((self.image.shape[0], self.image.shape[1], 3), np.uint8)
             COLOR_BOUNDS = [np.array([self.hl, self.sl, self.vl]), np.array([self.hu, self.su, self.vu])]
             self.finalMask = cv2.inRange(imageHSV, COLOR_BOUNDS[0], COLOR_BOUNDS[1])
             filteredHSV = cv2.bitwise_and(imageHSV, imageHSV, mask=self.finalMask)
             self.image_rgb_filtered = cv2.cvtColor(filteredHSV, cv2.COLOR_HSV2RGB)
-            self.internal = cv2.cvtColor(self.internal, cv2.COLOR_BGR2GRAY)
             contours, h = cv2.findContours(self.finalMask, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
 
-            if len(contours) > 0:
+            if len(contours) > 1:
                 hulls = [cv2.convexHull(cnt) for cnt in contours]
                 hulls = sorted(hulls, key=lambda c: cv2.contourArea(c), reverse=True)
                 contours = sorted(contours, key=lambda c: cv2.contourArea(c), reverse=True)
 
-                solidity = 0
+                solidity1 = 0
+                solidity2 = 0
                 try:
-                    area = cv2.contourArea(contours[0])
-                    hull_area = cv2.contourArea(hulls[0])
-                    solidity = float(area) / hull_area
+                    area1 = cv2.contourArea(contours[0])
+                    hull_area1 = cv2.contourArea(hulls[0])
+                    solidity1 = float(area1) / hull_area1
+                    area2 = cv2.contourArea(contours[1])
+                    hull_area2 = cv2.contourArea(hulls[1])
+                    solidity2 = float(area2) / hull_area2
                 except ZeroDivisionError:
                     pass
 
-                if cv2.contourArea(hulls[0]) >= self.min_area and 0.4 > solidity > 0.25:
+                if solidity1 > 0.8 and solidity2 > 0.8:
                     contour_color = colorsys.hsv_to_rgb(abs(self.hu + self.hl)/360.0, 1, 1)
                     cv2.drawContours(self.image_rgb_hulls, hulls, 0,
                                      (contour_color[0]*255, contour_color[1]*255, contour_color[2]*255),
                                      thickness=cv.CV_FILLED)  # draws contour(s)
-                    cv2.drawContours(self.internal, contours, 0, (255, 0, 0), thickness=cv.CV_FILLED)
-                    hulls_bitwise = cv2.inRange(self.image_rgb_hulls,
-                                                np.array([contour_color[0]*255-1, contour_color[1]*255-1, contour_color[2]*255-1]),
-                                                np.array([contour_color[0]*255+1, contour_color[1]*255+1, contour_color[2]*255+1]))
-                    self.internal = cv2.dilate(self.internal, (10, 10), iterations=20)
-                    hulls_bitwise = cv2.erode(hulls_bitwise, (10, 10), iterations=20)
-                    difference = cv2.subtract(hulls_bitwise, self.internal)
-                    internal_contours, h = cv2.findContours(difference, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
-                    internal_hulls = [cv2.convexHull(cnt) for cnt in internal_contours]
-                    internal_hulls = sorted(internal_hulls, key=lambda c: cv2.contourArea(c), reverse=True)
-                    cv2.drawContours(self.internal_rgb_hulls, internal_hulls, 0, (255, 0, 0), thickness=cv.CV_FILLED)
+                    cv2.drawContours(self.image_rgb_hulls, hulls, 1,
+                                     (contour_color[0] * 255, contour_color[1] * 255, contour_color[2] * 255),
+                                     thickness=cv.CV_FILLED)  # draws contour(s)
 
-
-                    # Less precise method for corners:
-                    # epsilon = 0.01 * cv2.arcLength(hulls[0], True)
-                    # cv2.drawContours(self.image_rgb_hulls, cv2.approxPolyDP(hulls[0], epsilon, True),
-                    #                  -1, (0, 255, 0), thickness=5)
-                    # self.corners = cv2.approxPolyDP(hulls[0], epsilon, True)
-
-                    # Better method:
                     self.corners = cv2.goodFeaturesToTrack(cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY),
                                                            4, self.corner_threshold, 10)
                     corners = []
@@ -165,34 +147,17 @@ class BlobDetector():
                                    thickness=self.image_rgb_hulls.shape[0]/300)
                         corners.append(corner.ravel())
 
+                    #TODO: Fix corner sorting!!
                     corners = sorted(corners, key=lambda c: c[0])
                     corners[:2] = sorted(corners[:2], key=lambda c: c[1])
                     corners[2:] = sorted(corners[2:], key=lambda c: c[1])
+
                     corners = np.array(corners, dtype=np.float32)
-                    cv2.drawContours(self.image_rgb_hulls, internal_hulls, 0, (255, 0, 0), thickness=cv.CV_FILLED)
-
-                    self.corners_internal = cv2.goodFeaturesToTrack(cv2.cvtColor(self.internal_rgb_hulls, cv2.COLOR_RGB2GRAY),
-                                                                                 4, self.corner_threshold, 10)
-                    internal_corners = []
-                    for corner in self.corners_internal:
-                        x, y = corner.ravel()
-                        cv2.circle(self.image_rgb_hulls, (x, y), self.image_rgb_hulls.shape[0] / 150, (0, 255, 0),
-                                   thickness=self.image_rgb_hulls.shape[0] / 300)
-                        internal_corners.append(corner.ravel())
-
-                    internal_corners = sorted(internal_corners, key=lambda c: c[0])
-                    internal_corners[:2] = sorted(internal_corners[:2], key=lambda c: c[1])
-                    internal_corners[2:] = sorted(internal_corners[2:], key=lambda c: c[1])
-                    internal_corners = np.array(internal_corners, dtype=np.float32)
-
-                    # all_corners = np.concatenate((corners, internal_corners), axis=0)
 
                     coordinate_corners = np.array([np.array([2, 10, 0]),
                                                    np.array([2, 2, 0]),
                                                    np.array([18, 10, 0]),
                                                    np.array([18, 2, 0])], dtype=np.float32)
-
-                    # calibration = cv2.calibrateCamera([coordinate_corners], [internal_corners], self.image_rgb_hulls.shape[:2])
 
                     camera_matrix = np.array([[560.477787, 0.000000, 333.440324],
                                              [0.000000, 564.670012, 257.144953],
@@ -200,9 +165,9 @@ class BlobDetector():
 
                     distortion_coefficients = np.array([[-0.321453, 0.145752, 0.000272, 0.002556, 0.000000]], dtype=np.float32)
 
-                    if len(internal_corners) == 4:
+                    if len(corners) == 4:
 
-                        rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, internal_corners, camera_matrix, distortion_coefficients)
+                        rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, corners, camera_matrix, distortion_coefficients)
                         # _, rvec, tvec = cv2.solvePnP(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
                         # print "Rotation Vector:\n" + str(rvec)
                         # print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
