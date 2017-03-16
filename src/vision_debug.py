@@ -14,13 +14,15 @@ from PIL import Image
 from PIL import ImageTk
 from Tkinter import Frame
 import cv2
+import socket
+import struct
 
 __author__ = "Jacob Nazarenko"
 __email__ = "jacobn@bu.edu"
 __license__ = "MIT"
 
 
-class BlobDetector():
+class BlobDetector:
 
     """The main class representing the vision detection process. Only one instance needs to be created,
     and all of the graphics and calculations should be taken care of by this instance. """
@@ -89,6 +91,14 @@ class BlobDetector():
 
     def image_callback(self):
 
+        # UDP STUFF
+        print("Opening network socket...")
+        host_ip = socket.gethostname()
+        send_port = 246
+        send_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        send_socket.connect((host_ip, send_port))
+        print("Opened socket at port 246!")
+
         print("Hello, OpenCV!\nLoading feed...")
         # be sure to enter the correct camera ip here!
         cap = cv2.VideoCapture("http://root:underclocked@128.197.50.26/mjpg/video.mjpg")
@@ -133,10 +143,10 @@ class BlobDetector():
                     contour_color = colorsys.hsv_to_rgb(abs(self.hu + self.hl)/360.0, 1, 1)
                     cv2.drawContours(self.image_rgb_hulls, hulls, 0,
                                      (contour_color[0]*255, contour_color[1]*255, contour_color[2]*255),
-                                     thickness=cv.CV_FILLED)  # draws contour(s)
+                                     thickness=cv.CV_FILLED)  # draws contour 1
                     cv2.drawContours(self.image_rgb_hulls, hulls, 1,
                                      (contour_color[0] * 255, contour_color[1] * 255, contour_color[2] * 255),
-                                     thickness=cv.CV_FILLED)  # draws contour(s)
+                                     thickness=cv.CV_FILLED)  # draws contour 2
 
                     self.corners = cv2.goodFeaturesToTrack(cv2.cvtColor(self.image_rgb_hulls, cv2.COLOR_RGB2GRAY),
                                                            4, self.corner_threshold, 10)
@@ -147,17 +157,22 @@ class BlobDetector():
                                    thickness=self.image_rgb_hulls.shape[0]/300)
                         corners.append(corner.ravel())
 
-                    #TODO: Fix corner sorting!!
                     corners = sorted(corners, key=lambda c: c[0])
                     corners[:2] = sorted(corners[:2], key=lambda c: c[1])
-                    corners[2:] = sorted(corners[2:], key=lambda c: c[1])
+                    corners[2:4] = sorted(corners[2:4], key=lambda c: c[1])
+                    corners[4:6] = sorted(corners[4:6], key=lambda c: c[1])
+                    corners[6:] = sorted(corners[6:], key=lambda c: c[1])
 
                     corners = np.array(corners, dtype=np.float32)
 
-                    coordinate_corners = np.array([np.array([2, 10, 0]),
-                                                   np.array([2, 2, 0]),
-                                                   np.array([18, 10, 0]),
-                                                   np.array([18, 2, 0])], dtype=np.float32)
+                    coordinate_corners = np.array([np.array([0, 5, 0]),
+                                                   np.array([0, 0, 0]),
+                                                   np.array([2, 5, 0]),
+                                                   np.array([2, 0, 0]),
+                                                   np.array([8, 5, 0]),
+                                                   np.array([8, 0, 0]),
+                                                   np.array([10, 5, 0]),
+                                                   np.array([10, 0, 0])], dtype=np.float32)
 
                     camera_matrix = np.array([[560.477787, 0.000000, 333.440324],
                                              [0.000000, 564.670012, 257.144953],
@@ -165,12 +180,15 @@ class BlobDetector():
 
                     distortion_coefficients = np.array([[-0.321453, 0.145752, 0.000272, 0.002556, 0.000000]], dtype=np.float32)
 
-                    if len(corners) == 4:
+                    if len(corners) == 8:
 
                         rvec, tvec, _ = cv2.solvePnPRansac(coordinate_corners, corners, camera_matrix, distortion_coefficients)
                         # _, rvec, tvec = cv2.solvePnP(coordinate_corners, all_corners, camera_matrix, distortion_coefficients)
                         # print "Rotation Vector:\n" + str(rvec)
                         # print "Translation Vector:\n" + str(tvec) + "\n-------------------------"
+
+                        msg = struct.pack("6f", ...)
+                        send_socket.send(msg)
 
                         axis_pts = cv2.projectPoints(np.array([[0, 0, 0], [0, 6, 0], [6, 0, 0], [0, 0, 6]], dtype=np.float32),
                                                      rvec, tvec, camera_matrix, distortion_coefficients)[0]
@@ -178,7 +196,6 @@ class BlobDetector():
                         pt1 = (int(axis_pts[1].ravel()[0]), int(axis_pts[1].ravel()[1]))
                         pt2 = (int(axis_pts[2].ravel()[0]), int(axis_pts[2].ravel()[1]))
                         pt3 = (int(axis_pts[3].ravel()[0]), int(axis_pts[3].ravel()[1]))
-                        # print (origin, pt1, pt2, pt3)
 
                         try:
                             cv2.line(self.image_rgb_hulls, origin, pt1, (0, 255, 0), thickness=3)
